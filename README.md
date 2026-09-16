@@ -1,31 +1,22 @@
 # GRATMA Multipuerto
 
-Script en Python utilizado para realizar **medidas I-V con varios dispositivos GRATMA al mismo tiempo** mediante distintos puertos serie.
+Script en Python para realizar **medidas I-V con uno o varios dispositivos GRATMA en paralelo** mediante distintos puertos serie.
 
-Cada GRATMA funciona de forma independiente en su propio hilo, permitiendo medir varios chips en paralelo. Las medidas se realizan sobre los 8 sensores siguiendo un orden aleatorio y los resultados se guardan automáticamente en una carpeta diferente para cada chip.
+Cada GRATMA funciona de forma independiente en su propio hilo. Los 8 sensores se miden siguiendo un orden aleatorio y los resultados se guardan automáticamente en una carpeta diferente para cada chip.
 
 ## Requisitos
 
-Para ejecutar el programa es necesario tener Python instalado junto con la librería:
+Es necesario tener Python instalado junto con la librería:
 
 ```bash
 pip install pyserial
 ```
 
-Los principales módulos utilizados son:
-
-- Serial
-- Threading
-- Random
-- Time
-- Datetime
-- Argparse
-- Os
-- Re
+El resto de módulos utilizados pertenecen a la librería estándar de Python.
 
 ## Parámetros de medida
 
-Los principales parámetros de la medida se pueden modificar al principio del código:
+Los principales parámetros se pueden modificar al comienzo del código:
 
 ```python
 VD = 50
@@ -33,57 +24,54 @@ VGINIT = 0
 VGEND = 1200
 VGSWEEP = 15
 FBWD = 1
-NUM_REP = 5
+NUM_SEQUENCES = 5
 ```
 
 Donde:
 
-- **VD**: tensión de drain en mV.
-- **VGINIT**: tensión inicial de gate en mV.
-- **VGEND**: tensión final de gate en mV.
-- **VGSWEEP**: paso de tensión utilizado durante el barrido en mV.
-- **FBWD**: tipo de barrido.
+- **VD**: tensión utilizada durante la medida, en mV.
+- **VGINIT**: tensión inicial del barrido, en mV.
+- **VGEND**: tensión final del barrido, en mV.
+- **VGSWEEP**: paso de tensión del barrido, en mV.
+- **FBWD**:
   - `0`: solamente barrido forward.
   - `1`: barrido forward y backward.
-- **NUM_REP**: número de secuencias completas sobre los 8 sensores.
+- **NUM_SEQUENCES**: número de secuencias completas sobre los 8 sensores.
 
-También se pueden modificar los tiempos utilizados durante la medida:
+También se pueden modificar los tiempos:
 
 ```python
-STABILIZE_S = 180
+STABILIZE_S = 600
 BETWEEN_SENSORS_S = 10
 ```
 
-En este caso se realiza una estabilización inicial de **180 segundos** y una espera de **10 segundos entre sensores**.
+Se realiza una estabilización inicial de **600 segundos** y una espera de **10 segundos entre sensores**.
 
 ## Carpeta de salida
 
-La carpeta principal donde se guardan las medidas se define al comienzo del código:
+La carpeta principal donde se guardan las medidas se define mediante:
 
 ```python
-FOLDER_PATH = r"C:\Users\labor\Desktop\chips_aging"
+FOLDER_PATH = r"C:\ruta\de\salida"
 ```
 
-Esta ruta debe modificarse dependiendo del ordenador donde se ejecute el programa.
-
-Dentro de esta carpeta se crea automáticamente una carpeta diferente para cada chip:
+Dentro de esta ruta se crea automáticamente una carpeta para cada chip:
 
 ```text
-chips_aging/
-├── FxCy_aging/
-├── FwCz_aging/
-└── ...
+F5C9_aging/
+F4C4_aging/
+...
 ```
 
-## Ejecución del programa
+## Ejecución
 
-El programa puede ejecutarse directamente desde una terminal:
+El programa se puede ejecutar desde la terminal mediante:
 
 ```bash
-python GRATMA_multipuerto.py
+python GRATMA_measures.py
 ```
 
-Si no se introducen argumentos, el programa pregunta por terminal:
+Al comenzar solicita:
 
 1. Número de equipos que se van a medir.
 2. Puerto COM de cada equipo.
@@ -96,94 +84,136 @@ Por ejemplo:
 Número de equipos a medir en paralelo: 2
 
 --- Equipo 1/2 ---
-Puerto COM: COM8
-Nombre del wafer: USAGRAPH1
-Código del chip: F5C9
+Puerto COM: COM4
+Wafer: APS5
+Chip: F4C4
 
 --- Equipo 2/2 ---
-Puerto COM: COM9
-Nombre del wafer: USAGRAPH1
-Código del chip: F5C10
-```
-
-También es posible introducir directamente los dispositivos al ejecutar el programa:
-
-```bash
-python GRATMA_multipuerto.py --device COM8:USAGRAPH1:F5C9 --device COM9:USAGRAPH1:F5C10
-```
-
-Si solamente se utiliza un GRATMA, también se puede ejecutar de la siguiente forma:
-
-```bash
-python GRATMA_multipuerto.py --port COM8 --wafer USAGRAPH1 --chip F5C9
+Puerto COM: COM7
+Wafer: APS5
+Chip: F5C9
 ```
 
 ## Funcionamiento de la medida
 
 Una vez iniciado el programa:
 
-1. Se abren los puertos serie de los equipos.
-2. Se crea una carpeta de salida para cada chip.
-3. Se envía el comando `um 1` para poner a tierra los sensores que no se están midiendo.
+1. Se crean las carpetas de salida.
+2. Se abren los puertos serie.
+3. Se configura el estado eléctrico mediante los comandos `um`, `sw` y `sv`.
 4. Se realiza el tiempo de estabilización inicial.
-5. Todos los GRATMA comienzan las medidas en paralelo.
-6. Cada equipo mide los 8 sensores siguiendo un orden aleatorio.
-7. El proceso se repite según el valor definido en `NUM_REP`.
-8. Los resultados se guardan automáticamente.
+5. Cada GRATMA comienza las medidas de forma independiente.
+6. Los 8 sensores se miden siguiendo un orden aleatorio.
+7. Se ejecuta el barrido I-V mediante el comando `iv`.
+8. Se extraen y validan los valores `Vfg`, `Vs`, `Ig` e `Is`.
+9. Solo las medidas válidas se guardan como TXT final.
 
-El orden de los sensores cambia en cada secuencia. Además, el programa intenta alternar entre los sensores 1–4 y 5–8 para evitar medir siempre sensores de la misma zona de forma consecutiva.
+El orden de los sensores cambia en cada secuencia. Los sensores 1–4 y 5–8 se aleatorizan por separado y se alternan durante la medida para evitar medir siempre en el mismo orden.
 
 ## Archivos generados
 
 Los archivos finales siguen el formato:
 
 ```text
-Wafer_Chip_aging_ArrayN_random_Secuencia_Electrolito.txt
+Wafer_Chip_stage_ArrayN_random_Secuencia_Electrolito.txt
 ```
 
 Por ejemplo:
 
 ```text
-USAGRAPH1_F5C9_aging_Array3_random_2_PB-S0_01.txt
+APS5_F5C9_stage_Array3_random_2_PB-S0_01.txt
 ```
 
-Al comienzo de cada archivo se guarda información sobre la configuración utilizada durante la medida, como el chip, wafer, sensor, secuencia, tensiones utilizadas o puertos que estaban funcionando en paralelo.
+Al comienzo de cada archivo se guarda información sobre la configuración utilizada durante la medida.
 
-Después se guardan los datos de la medida con las columnas:
+Los datos se guardan con las columnas:
 
 ```text
 Vfg;Vs;Ig;Is
 ```
 
-Los valores de **Vfg, Vs, Ig e Is se obtienen directamente de la información devuelta por el GRATMA**.
+Los valores de `Vfg`, `Vs`, `Ig` e `Is` se obtienen directamente de la información devuelta por el GRATMA.
 
-Durante la medida también se genera un archivo temporal cuyo nombre comienza por:
+También se genera un archivo:
 
 ```text
-All_info_
+All_info_...
 ```
 
-Este archivo contiene toda la información recibida desde el GRATMA por el puerto serie y se mantiene para poder revisar los datos en caso de que haya algún problema.
+que contiene toda la información recibida por el puerto serie y permite revisar detalladamente la medida.
+
+## Control de errores
+
+El programa incluye diferentes comprobaciones para evitar guardar medidas incorrectas.
+
+Una medida puede detenerse si ocurre alguno de estos problemas:
+
+- Error de comunicación con el puerto serie.
+- Tiempo máximo de medida superado.
+- Ausencia prolongada de datos.
+- Error explícito devuelto por el firmware.
+- Número incorrecto de puntos recibidos.
+- Valores no válidos (`NaN` o infinito).
+- Error durante la inicialización o configuración del GRATMA.
+
+Si una medida falla, no se genera el TXT final y el archivo `All_info_` se conserva como:
+
+```text
+All_info_....FAILED.txt
+```
+
+### Recuperación automática
+
+Si el firmware devuelve:
+
+```text
+Cannot start sweep - system not ready (state=4)
+```
+
+el programa envía automáticamente:
+
+```text
+reset
+```
+
+y vuelve a intentar una vez la medida del mismo sensor.
+
+Si el problema continúa después del reset, ese GRATMA se detiene.
+
+Un fallo en un GRATMA **no detiene los demás equipos** que estén midiendo en paralelo. Solo `Ctrl+C` provoca una parada global.
+
+## Protección de archivos
+
+Por defecto:
+
+```python
+ALLOW_OVERWRITE = False
+```
+
+Esto evita sobrescribir accidentalmente una medida que ya existe.
+
+Si el programa detecta un TXT final existente para ese chip, no comienza una nueva medida sobre esos archivos.
 
 ## Medidas en paralelo
 
-Cada GRATMA se ejecuta en un hilo diferente, por lo que varios dispositivos conectados a distintos puertos COM pueden realizar las medidas al mismo tiempo.
+Cada GRATMA se ejecuta en un hilo diferente, por lo que varios dispositivos conectados a diferentes puertos COM pueden medir al mismo tiempo.
 
-En la terminal, los mensajes de cada dispositivo aparecen identificados con su puerto:
+Los mensajes de terminal aparecen identificados mediante su puerto:
 
 ```text
-[COM8] ...
-[COM9] ...
+[COM4] ...
+[COM7] ...
 ```
 
-De esta forma es más fácil seguir el estado de cada medida cuando se están utilizando varios dispositivos.
+Esto permite seguir de forma independiente el estado de cada equipo.
 
-El programa tampoco permite configurar dos veces el mismo puerto COM ni utilizar el mismo nombre de chip para dos equipos diferentes.
+El programa no permite utilizar dos veces el mismo puerto COM ni asignar el mismo nombre de chip a dos equipos diferentes.
 
 ## Notas
 
-- Comprobar los puertos COM antes de comenzar la medida.
-- Modificar `FOLDER_PATH` si el programa se utiliza en otro ordenador.
+- Comprobar los puertos COM antes de comenzar.
+- Modificar `FOLDER_PATH` según el ordenador utilizado.
 - Comprobar que ningún otro programa esté utilizando los puertos serie.
-- Si no se puede generar correctamente el TXT final, se conserva el archivo `All_info_` para poder revisar los datos originales.
-- Al terminar todas las medidas, el programa muestra un resumen con los archivos guardados y el estado de cada dispositivo.
+- Revisar los archivos `All_info_` si una medida presenta algún problema.
+- Los archivos `.FAILED.txt` indican medidas que no se han considerado válidas.
+- Al finalizar se muestra un resumen con el número de medidas válidas y el estado de cada GRATMA.
